@@ -23,6 +23,7 @@ import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
 import uk.ac.ebi.eva.accession.core.GenericApplication
+import uk.ac.ebi.eva.accession.core.model.eva.SubmittedVariantEntity
 
 import static org.junit.Assert.assertEquals
 import static uk.ac.ebi.eva.groovy.commons.CommonTestUtils.createRS
@@ -82,5 +83,14 @@ class EVADatabaseEnvironmentTest {
             assertEquals(3e9.toLong() + rsAccessionOffset,
                     dbEnv.clusteredVariantAccessioningService.getByAccession(3e9.toLong() + rsAccessionOffset).accession)
         }
+    }
+
+    @Test
+    void testBulkInsertIgnoreDuplicates() {
+        def allSS = (1L..10L).collect{createSS(ASSEMBLY, TAXONOMY, 5e9.toLong() + it,
+                3e9.toLong() + it, 100+it, "C", "G")}
+        assertEquals(10, dbEnv.bulkInsertIgnoreDuplicates(allSS, SubmittedVariantEntity.class))
+        // Ensure that invoking the bulkInsertIgnoreDuplicates the second time does not result in any inserts
+        assertEquals(0, dbEnv.bulkInsertIgnoreDuplicates(allSS, SubmittedVariantEntity.class))
     }
 }

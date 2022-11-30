@@ -15,9 +15,13 @@
  */
 package uk.ac.ebi.eva.groovy.commons
 
+import com.mongodb.MongoBulkWriteException
+import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.MongoClient
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.PropertiesPropertySource
+import org.springframework.dao.DuplicateKeyException
+import org.springframework.data.mongodb.core.BulkOperations
 import org.springframework.data.mongodb.core.MongoTemplate
 import uk.ac.ebi.eva.accession.core.model.dbsnp.DbsnpClusteredVariantEntity
 import uk.ac.ebi.eva.accession.core.model.dbsnp.DbsnpClusteredVariantOperationEntity
@@ -80,5 +84,36 @@ class EVADatabaseEnvironment {
         def sva = context.getBean(SubmittedVariantAccessioningService.class)
         def cva = context.getBean(ClusteredVariantAccessioningService.class)
         return new EVADatabaseEnvironment(mc, mt, sva, cva, context)
+    }
+
+    /***
+     * Bulk insert records to a given collection in a Mongo database environment
+     * @param recordsToInsert List of entities to insert
+     * @param collectionClass Type of entity to insert
+     * @param collectionName Explicit collection name if it is other than the pre-defined collection for collectionClass
+     * (ex: submittedVariantEntity_custom)
+     * @return Number of inserted documents
+     */
+    <T> int bulkInsertIgnoreDuplicates(List<T> recordsToInsert, Class<T> collectionClass,
+                                       String collectionName = null) {
+        if (recordsToInsert.size() > 0) {
+            BulkOperations ops
+            if (Objects.isNull(collectionName)) {
+                ops = this.mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, collectionClass)
+            } else {
+                ops = this.mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, collectionClass, collectionName)
+            }
+            ops.insert(recordsToInsert)
+            BulkWriteResult bulkWriteResult
+            try {
+                bulkWriteResult = ops.execute()
+            }
+            catch(DuplicateKeyException duplicateKeyException) {
+                MongoBulkWriteException writeException = ((MongoBulkWriteException) duplicateKeyException.getCause())
+                bulkWriteResult = writeException.getWriteResult()
+            }
+            return Objects.isNull(bulkWriteResult)? 0: bulkWriteResult.insertedCount
+        }
+        return 0
     }
 }

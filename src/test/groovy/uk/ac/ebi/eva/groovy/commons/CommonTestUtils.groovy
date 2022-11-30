@@ -15,6 +15,8 @@
  */
 package uk.ac.ebi.eva.groovy.commons
 
+import uk.ac.ebi.eva.accession.core.model.ClusteredVariant
+import uk.ac.ebi.eva.accession.core.model.SubmittedVariant
 import uk.ac.ebi.eva.accession.core.model.eva.ClusteredVariantEntity
 import uk.ac.ebi.eva.accession.core.model.eva.SubmittedVariantEntity
 import uk.ac.ebi.eva.commons.core.models.VariantType
@@ -23,14 +25,13 @@ class CommonTestUtils {
     static SubmittedVariantEntity createSS(String assembly, int taxonomy, Long ssAccession, Long rsAccession,
                                            Long start, String reference, String alternate) {
 
-        return new SubmittedVariantEntity(ssAccession, "hash" + ssAccession, assembly, taxonomy,
-                "PRJ1", "chr1", start, reference, alternate, rsAccession, false, false, false,
-                false, 1)
+        SubmittedVariant sv = new SubmittedVariant(assembly, taxonomy, "PRJ1", "chr1", start, reference,
+                alternate, rsAccession)
+        return EVAObjectModelUtils.toSubmittedVariantEntity(ssAccession, sv)
     }
 
     static ClusteredVariantEntity createRS(String assembly, int taxonomy, Long rsAccession, Long start) {
-
-        return new ClusteredVariantEntity(rsAccession, "hash" + rsAccession, assembly, taxonomy,
-                "chr1", start, VariantType.SNV, false, null, 1)
+        ClusteredVariant cv = new ClusteredVariant(assembly, taxonomy, "chr1", start, VariantType.SNV, true, null)
+        return EVAObjectModelUtils.toClusteredVariantEntity(rsAccession, cv)
     }
 }
