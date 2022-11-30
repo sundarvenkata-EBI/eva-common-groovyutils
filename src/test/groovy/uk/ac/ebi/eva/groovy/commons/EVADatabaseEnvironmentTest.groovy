@@ -20,8 +20,12 @@ import com.mongodb.ReadPreference
 import com.mongodb.WriteConcern
 import org.junit.After
 import org.junit.Before
-import org.junit.BeforeClass
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.ApplicationContext
+import org.springframework.test.context.TestPropertySource
+import org.springframework.test.context.junit4.SpringRunner
 import uk.ac.ebi.eva.accession.core.GenericApplication
 import uk.ac.ebi.eva.accession.core.model.eva.SubmittedVariantEntity
 
@@ -29,18 +33,19 @@ import static org.junit.Assert.assertEquals
 import static uk.ac.ebi.eva.groovy.commons.CommonTestUtils.createRS
 import static uk.ac.ebi.eva.groovy.commons.CommonTestUtils.createSS
 
+@RunWith(SpringRunner.class)
+@TestPropertySource(CommonTestUtils.testPropertiesFilePath)
 class EVADatabaseEnvironmentTest {
+    @Autowired
+    private ApplicationContext applicationContext
+
+    private boolean dbEnvSetupDone = false
+
     private static final String ASSEMBLY = "GCA_000000001.1"
 
     private static final int TAXONOMY = 60711
 
     private static EVADatabaseEnvironment dbEnv
-
-    @BeforeClass
-    static void init() {
-        def propertiesFilePath = new File("src/test/resources/application-test.properties").absolutePath
-        dbEnv = EVADatabaseEnvironment.createFromSpringContext(propertiesFilePath, GenericApplication.class)
-    }
 
     private static void cleanup() {
         dbEnv.mongoClient.dropDatabase(dbEnv.mongoTemplate.db.name)
@@ -48,6 +53,14 @@ class EVADatabaseEnvironmentTest {
 
     @Before
     void setUp() {
+        if (!this.dbEnvSetupDone) {
+            // We need to directly use the application-test.properties file here
+            // because there are symbolic variables like |eva.mongo.host.test|
+            // that needs to be resolved by Spring and Maven dynamically
+            def dynamicPropertyFilePath = CommonTestUtils.getTempPropertyFilePath(applicationContext)
+            dbEnv = EVADatabaseEnvironment.createFromSpringContext(dynamicPropertyFilePath, GenericApplication.class)
+            this.dbEnvSetupDone = true
+        }
         cleanup()
     }
 

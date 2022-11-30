@@ -15,14 +15,7 @@
  */
 package uk.ac.ebi.eva.groovy.commons
 
-import com.mongodb.ReadConcern
-import com.mongodb.ReadPreference
-import com.mongodb.WriteConcern
-import org.junit.After
-import org.junit.Before
-import org.junit.BeforeClass
 import org.junit.Test
-import uk.ac.ebi.eva.accession.core.GenericApplication
 import uk.ac.ebi.eva.accession.core.model.ClusteredVariant
 import uk.ac.ebi.eva.accession.core.model.SubmittedVariant
 import uk.ac.ebi.eva.accession.core.model.eva.ClusteredVariantEntity
@@ -30,8 +23,6 @@ import uk.ac.ebi.eva.accession.core.model.eva.SubmittedVariantEntity
 import uk.ac.ebi.eva.commons.core.models.VariantType
 
 import static org.junit.Assert.assertEquals
-import static uk.ac.ebi.eva.groovy.commons.CommonTestUtils.createRS
-import static uk.ac.ebi.eva.groovy.commons.CommonTestUtils.createSS
 import static uk.ac.ebi.eva.groovy.commons.EVAObjectModelUtils.*
 
 class EVAObjectModelUtilsTest {

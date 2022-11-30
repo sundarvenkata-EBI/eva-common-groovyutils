@@ -18,11 +18,15 @@ package uk.ac.ebi.eva.groovy.commons
 import com.mongodb.MongoCursorNotFoundException
 import org.junit.After
 import org.junit.Before
-import org.junit.BeforeClass
 import org.junit.Ignore
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mockito
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.ApplicationContext
 import org.springframework.data.mongodb.core.query.Criteria
+import org.springframework.test.context.TestPropertySource
+import org.springframework.test.context.junit4.SpringRunner
 import uk.ac.ebi.eva.accession.core.GenericApplication
 import uk.ac.ebi.eva.accession.core.model.eva.SubmittedVariantEntity
 
@@ -30,7 +34,14 @@ import static org.junit.Assert.assertEquals
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS
 import static uk.ac.ebi.eva.groovy.commons.CommonTestUtils.createSS
 
+@RunWith(SpringRunner.class)
+@TestPropertySource(CommonTestUtils.testPropertiesFilePath)
 class RetryableBatchingCursorTest {
+
+    @Autowired
+    private ApplicationContext applicationContext
+
+    private boolean dbEnvSetupDone = false
 
     private static final String ASSEMBLY = "GCA_000000001.1"
 
@@ -38,18 +49,17 @@ class RetryableBatchingCursorTest {
 
     private static EVADatabaseEnvironment dbEnv
 
-    @BeforeClass
-    static void init() {
-        def propertiesFilePath = new File("src/test/resources/application-test.properties").absolutePath
-        dbEnv = EVADatabaseEnvironment.createFromSpringContext(propertiesFilePath, GenericApplication.class)
-    }
-
     private static void cleanup() {
         dbEnv.mongoClient.dropDatabase(dbEnv.mongoTemplate.db.name)
     }
 
     @Before
     void setUp() {
+        if (!this.dbEnvSetupDone) {
+            def dynamicPropertyFilePath = CommonTestUtils.getTempPropertyFilePath(applicationContext)
+            dbEnv = EVADatabaseEnvironment.createFromSpringContext(dynamicPropertyFilePath, GenericApplication.class)
+            this.dbEnvSetupDone = true
+        }
         cleanup()
     }
 
@@ -124,7 +134,6 @@ class RetryableBatchingCursorTest {
         def numRecords = 0
         def batchIndex = 0
         evaCursor.forEach {batch ->
-            batch.each {println(it)}
             if (batchIndex <= 2) {
                 assertEquals(3, ((List) batch).size())
             } else {
