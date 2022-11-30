@@ -35,6 +35,21 @@
         </dependency>
     </dependencies>
 
+    <repositories>
+        <repository>
+            <id>cloudsmith</id>
+            <url>https://dl.cloudsmith.io/public/ebivariation/packages/maven/</url>
+            <releases>
+                <enabled>true</enabled>
+                <updatePolicy>always</updatePolicy>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>always</updatePolicy>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <distributionManagement>
         <snapshotRepository>
             <id>cloudsmith</id>
