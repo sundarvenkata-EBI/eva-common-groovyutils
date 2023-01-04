@@ -19,6 +19,7 @@ import com.mongodb.MongoBulkWriteException
 import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.MongoClient
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import org.springframework.core.env.MapPropertySource
 import org.springframework.core.env.PropertiesPropertySource
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.data.mongodb.core.BulkOperations
@@ -71,11 +72,16 @@ class EVADatabaseEnvironment {
      * accessioning pipeline is needed, use uk.ac.ebi.eva.depre)
      * @return A database Environment
      */
-    static EVADatabaseEnvironment createFromSpringContext(String propertiesFile, Class springApplicationClass) {
+    static EVADatabaseEnvironment createFromSpringContext(String propertiesFile, Class springApplicationClass,
+                                                          Map<String, Object> otherProperties = null) {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()
         def appProps = new Properties()
+        Map<String, Object>
         appProps.load(new FileInputStream(new File(propertiesFile)))
         context.getEnvironment().getPropertySources().addLast(new PropertiesPropertySource("main", appProps))
+        if (Objects.nonNull(otherProperties)) {
+            context.getEnvironment().getPropertySources().addLast(new MapPropertySource("other", otherProperties))
+        }
         context.register(springApplicationClass)
         context.refresh()
 
@@ -85,6 +91,7 @@ class EVADatabaseEnvironment {
         def cva = context.getBean(ClusteredVariantAccessioningService.class)
         return new EVADatabaseEnvironment(mc, mt, sva, cva, context)
     }
+
 
     /***
      * Bulk insert records to a given collection in a Mongo database environment
