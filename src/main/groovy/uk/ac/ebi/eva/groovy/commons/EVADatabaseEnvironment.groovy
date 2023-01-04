@@ -76,7 +76,6 @@ class EVADatabaseEnvironment {
                                                           Map<String, Object> otherProperties = null) {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()
         def appProps = new Properties()
-        Map<String, Object>
         appProps.load(new FileInputStream(new File(propertiesFile)))
         context.getEnvironment().getPropertySources().addLast(new PropertiesPropertySource("main", appProps))
         if (Objects.nonNull(otherProperties)) {
