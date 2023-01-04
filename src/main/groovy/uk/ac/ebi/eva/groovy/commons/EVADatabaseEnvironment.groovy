@@ -69,7 +69,7 @@ class EVADatabaseEnvironment {
      * @param propertiesFile Application properties file (ex: application.properties)
      * that is used to run Spring-based pipelines
      * @param springApplicationClass Application class that should be wired (ex: if an environment for
-     * accessioning pipeline is needed, use uk.ac.ebi.eva.depre)
+     * accessioning pipeline is needed, use uk.ac.ebi.eva.deprecate.Application)
      * @return A database Environment
      */
     static EVADatabaseEnvironment createFromSpringContext(String propertiesFile, Class springApplicationClass,
