@@ -72,6 +72,11 @@ class EVAObjectModelUtilsTest {
     @Test
     void testToClusteredVariant() {
         assertEquals(realWorldCV, toClusteredVariant(realWorldSV))
+        def realWorldSVWithMapWeight = new SubmittedVariant(realWorldSV.referenceSequenceAccession,
+                realWorldSV.taxonomyAccession, realWorldSV.projectAccession, realWorldSV.contig, realWorldSV.start,
+                realWorldSV.referenceAllele, realWorldSV.alternateAllele, realWorldSV.clusteredVariantAccession)
+        realWorldSVWithMapWeight.setMapWeight(3)
+        assertEquals(3, toClusteredVariant(realWorldSVWithMapWeight).mapWeight)
     }
 
     @Test

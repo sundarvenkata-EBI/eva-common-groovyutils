@@ -37,12 +37,14 @@ class EVAObjectModelUtils {
     }
 
     static ClusteredVariant toClusteredVariant(ISubmittedVariant submittedVariant) {
-        return new ClusteredVariant(submittedVariant.getReferenceSequenceAccession(),
+        def cv = new ClusteredVariant(submittedVariant.getReferenceSequenceAccession(),
                 submittedVariant.getTaxonomyAccession(), submittedVariant.getContig(),
                 submittedVariant.getStart(),
                 VariantClassifier.getVariantClassification(submittedVariant.getReferenceAllele(),
                         submittedVariant.getAlternateAllele()), submittedVariant.isValidated(),
                 submittedVariant.getCreatedDate())
+        if (Objects.nonNull(submittedVariant.mapWeight)) cv.setMapWeight(submittedVariant.mapWeight)
+        return cv
     }
 
     static ClusteredVariantEntity toClusteredVariantEntity(SubmittedVariantEntity submittedVariantEntity) {
