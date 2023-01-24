@@ -15,6 +15,7 @@
  */
 package uk.ac.ebi.eva.groovy.commons
 
+import com.mongodb.MongoCursorNotFoundException
 import com.mongodb.client.MongoCursor
 import org.bson.Document
 import org.slf4j.LoggerFactory
@@ -52,8 +53,7 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
         fixedBackOffPolicy.setBackOffPeriod(2000l)
         retryTemplate.setBackOffPolicy(fixedBackOffPolicy)
 
-        SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy()
-        retryPolicy.setMaxAttempts(5)
+        SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy(5, [(MongoCursorNotFoundException.class): Boolean.TRUE])
         retryTemplate.setRetryPolicy(retryPolicy)
 
         return retryTemplate.execute(new RetryCallback<Boolean, Throwable>() {
