@@ -111,6 +111,22 @@ class RetryableBatchingCursorTest {
     }
 
     @Test
+    void testEVACursorTimeouts() {
+        def allSS = (1..100000).collect{createSS(ASSEMBLY, TAXONOMY, it, it+2, 100+it, "C", "G")}
+        allSS.collate(1000).each{dbEnv.mongoTemplate.insert(it, EVADatabaseEnvironment.sveClass)}
+        def evaCursor = new RetryableBatchingCursor(new Criteria(), dbEnv.mongoTemplate, (Class) EVADatabaseEnvironment.sveClass, 100)
+        evaCursor.setRefreshInterval(30e3.toLong())
+        evaCursor.each {it ->
+            (1..100).each {
+                dbEnv.mongoTemplate.findAll(EVADatabaseEnvironment.sveClass)
+                println(it)
+                Thread.sleep(100)
+            }
+            println(it)
+        }
+    }
+
+    @Test
     //TODO: Currently this test mock is not injecting MongoCursorNotFoundException for some reason - should be fixed!
     @Ignore
     void testEVACursorRestarts() {

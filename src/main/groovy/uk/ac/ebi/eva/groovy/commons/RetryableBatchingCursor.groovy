@@ -15,8 +15,12 @@
  */
 package uk.ac.ebi.eva.groovy.commons
 
+import com.mongodb.ClientSessionOptions
+import com.mongodb.session.ClientSession
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.CriteriaDefinition
+
+import java.util.concurrent.TimeUnit
 
 class RetryableBatchingCursor<T> implements Iterable<T> {
     CriteriaDefinition filterCriteria
@@ -50,14 +54,26 @@ class RetryableBatchingCursor<T> implements Iterable<T> {
         this.batchSize = batchSize
         this.collectionName = Objects.isNull(collectionName)? this.mongoTemplate.getCollectionName(this.collectionClass): collectionName
 
-        def mongoIterator = this.mongoTemplate.getCollection(this.collectionName).find(
-                this.filterCriteria.criteriaObject).noCursorTimeout(true).batchSize(batchSize).iterator()
-        this.resultIterator = new RetryableBatchingCursorIterator(this.collectionClass, this.mongoTemplate, mongoIterator,
-                this.batchSize)
+        ClientSessionOptions sessionOptions = ClientSessionOptions.builder()
+                .causallyConsistent(true).build()
+
+        ClientSession session = this.mongoTemplate.mongoDbFactory.getSession(sessionOptions)
+
+        mongoTemplate.withSession(() -> session).execute { mongoOp ->
+            def serverSessionID = session.serverSession.identifier
+            def mongoIterator = mongoOp.getCollection(this.collectionName).find(
+                    this.filterCriteria.criteriaObject).noCursorTimeout(true).batchSize(batchSize).iterator()
+            this.resultIterator = new RetryableBatchingCursorIterator(serverSessionID, this.collectionClass,
+                    this.mongoTemplate, mongoIterator, this.batchSize)
+        }
     }
 
     @Override
     RetryableBatchingCursorIterator<T> iterator() {
         return this.resultIterator
+    }
+
+    void setRefreshInterval (Long refreshInterval) {
+        this.resultIterator.setRefreshInterval(refreshInterval)
     }
 }
