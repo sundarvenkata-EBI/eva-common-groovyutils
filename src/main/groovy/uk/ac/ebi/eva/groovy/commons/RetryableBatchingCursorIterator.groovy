@@ -27,8 +27,9 @@ import org.springframework.retry.RetryContext
 import org.springframework.retry.backoff.FixedBackOffPolicy
 import org.springframework.retry.policy.SimpleRetryPolicy
 import org.springframework.retry.support.RetryTemplate
-import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
+
+import java.util.concurrent.ScheduledFuture
 
 class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
     BsonDocument serverSessionID
@@ -40,6 +41,8 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
     // By default, the cursorTimeoutMillis on a Mongo server is 10 minutes
     // Therefore, try refreshing the cursors every 8 minutes (480e3 milliseconds)
     Long refreshInterval = 480e3.toLong()
+    ThreadPoolTaskScheduler scheduler
+    ScheduledFuture periodicRefreshFuture
 
     final static def logger = LoggerFactory.getLogger(RetryableBatchingCursorIterator.class)
 
@@ -60,12 +63,14 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
     }
 
     private void startPeriodicSessionRefresh() {
-        TaskScheduler scheduler = new ThreadPoolTaskScheduler()
-        scheduler.setPoolSize(3)
-        scheduler.initialize()
-        scheduler.scheduleAtFixedRate(new Runnable() {
+        this.scheduler = new ThreadPoolTaskScheduler()
+        this.scheduler.setPoolSize(3)
+        this.scheduler.setWaitForTasksToCompleteOnShutdown(true)
+        this.scheduler.initialize()
+        this.periodicRefreshFuture = this.scheduler.scheduleAtFixedRate(new Runnable() {
             @Override
             void run() {
+                // See https://stackoverflow.com/a/68991661
                 this.mongoTemplate.db.runCommand(new Document("refreshSessions", Arrays.asList(this.serverSessionID)))
             }
         }, this.refreshInterval)
@@ -74,6 +79,7 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
     @Override
     boolean hasNext() {
         if (!startPeriodicRefreshThread) {
+            // Periodically refresh sessions to avoid Mongo CursorNotFound errors
             startPeriodicSessionRefresh()
             startPeriodicRefreshThread = true
         }
@@ -90,10 +96,12 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
             @Override
             Boolean doWithRetry(RetryContext context) throws Throwable {
                 logger.debug("Retry count:" + context.retryCount)
-                return this.hasNextResult()
+                def result = this.hasNextResult()
+                // If the cursor is ending (no next result), cancel the periodic refresh thread
+                if(!result) this.scheduler.shutdown()
+                return result
             }
         })
-
     }
 
     // We only need this function because resultIterator cannot be mocked for testing because it is a final class
