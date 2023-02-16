@@ -18,6 +18,7 @@ package uk.ac.ebi.eva.groovy.commons
 import com.mongodb.MongoBulkWriteException
 import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.MongoClient
+import org.bson.Document
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.MapPropertySource
 import org.springframework.core.env.PropertiesPropertySource
@@ -121,5 +122,48 @@ class EVADatabaseEnvironment {
             return Objects.isNull(bulkWriteResult)? 0: bulkWriteResult.insertedCount
         }
         return 0
+    }
+
+    static def shardCollection = {collectionName, dbEnvironment ->
+        def fqdbName = dbEnvironment.mongoTemplate.getDb().name + "." + collectionName
+        def shardCommandDocument = new Document("shardCollection", fqdbName)
+        shardCommandDocument.put("key", new Document("_id", 1))
+        dbEnvironment.mongoClient.getDatabase("admin").runCommand(shardCommandDocument)
+    }
+
+    public void restoreCollectionsToOriginalState() {
+        // Restore collections to their original state
+        this.mongoTemplate.getCollectionNames().each { collectionName ->
+            def before_remediation_suffix = "_before_remediation"
+            def targetCollectionName = collectionName.replace(before_remediation_suffix, "")
+            if (collectionName.endsWith(before_remediation_suffix)) {
+                this.mongoTemplate.getCollection(targetCollectionName).drop()
+                this.mongoTemplate.getCollection(collectionName).aggregate(
+                        Collections.singletonList(new Document("\$out",
+                                targetCollectionName))).allowDiskUse(true).size()
+                shardCollection(targetCollectionName, this)
+            }
+        }
+    }
+
+    private void backup(String backupSuffix) {
+        this.mongoTemplate.getCollectionNames().each {collectionName ->
+            def before_remediation_suffix = "_before_remediation"
+            def after_remediation_suffix = "_after_remediation"
+            def targetCollectionName = collectionName + backupSuffix
+            if (!collectionName.endsWith(after_remediation_suffix) && !collectionName.endsWith(before_remediation_suffix)) {
+                this.mongoTemplate.getCollection(collectionName).aggregate(
+                        Collections.singletonList(new Document("\$out",
+                                targetCollectionName))).allowDiskUse(true).size()
+            }
+        }
+    }
+
+    public void backupCollectionsAfterRemediation() {
+        backup("_after_remediation")
+    }
+
+    public void backupCollectionsBeforeRemediation() {
+        backup("_before_remediation")
     }
 }
