@@ -17,6 +17,7 @@ package uk.ac.ebi.eva.groovy.commons
 
 import org.springframework.context.ApplicationContext
 import org.springframework.core.env.MapPropertySource
+import uk.ac.ebi.eva.accession.core.EVAObjectModelUtils
 import uk.ac.ebi.eva.accession.core.model.ClusteredVariant
 import uk.ac.ebi.eva.accession.core.model.SubmittedVariant
 import uk.ac.ebi.eva.accession.core.model.eva.ClusteredVariantEntity
