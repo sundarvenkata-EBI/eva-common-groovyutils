@@ -17,10 +17,9 @@ package uk.ac.ebi.eva.groovy.commons
 
 import com.mongodb.ClientSessionOptions
 import com.mongodb.session.ClientSession
+import org.bson.Document
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.CriteriaDefinition
-
-import java.util.concurrent.TimeUnit
 
 class RetryableBatchingCursor<T> implements Iterable<T> {
     CriteriaDefinition filterCriteria
@@ -62,7 +61,12 @@ class RetryableBatchingCursor<T> implements Iterable<T> {
         mongoTemplate.withSession(() -> session).execute { mongoOp ->
             def serverSessionID = session.serverSession.identifier
             def mongoIterator = mongoOp.getCollection(this.collectionName).find(
-                    this.filterCriteria.criteriaObject).noCursorTimeout(true).batchSize(batchSize).iterator()
+                    this.filterCriteria.criteriaObject).sort(new Document("_id", 1))
+                    .noCursorTimeout(true).batchSize(batchSize).iterator()
+//            def mongoIterator = mongoOp.getCollection(this.collectionName)
+//                    .aggregate(session, Arrays.asList(Aggregates.match(this.filterCriteria.criteriaObject)),
+//                            Document.class)
+//                    .allowDiskUse(true).useCursor(true).batchSize(batchSize).iterator()
             this.resultIterator = new RetryableBatchingCursorIterator(serverSessionID, this.collectionClass,
                     this.mongoTemplate, mongoIterator, this.batchSize)
         }
