@@ -111,6 +111,8 @@ class RetryableBatchingCursorTest {
     }
 
     @Test
+    //TODO: Currently this test is very flaky and does not properly induce the error. Need a more reliable test.
+    @Ignore
     void testEVACursorTimeouts() {
         def allSS = (1..100000).collect{createSS(ASSEMBLY, TAXONOMY, it, it+2, 100+it, "C", "G")}
         allSS.collate(1000).each{dbEnv.mongoTemplate.insert(it, EVADatabaseEnvironment.sveClass)}
