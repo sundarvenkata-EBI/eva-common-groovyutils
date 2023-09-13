@@ -16,11 +16,12 @@
 package uk.ac.ebi.eva.groovy.commons
 
 import com.mongodb.ClientSessionOptions
+import com.mongodb.MongoClientException
 import com.mongodb.session.ClientSession
+import org.bson.BsonDocument
+import org.springframework.data.mongodb.core.MongoOperations
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.CriteriaDefinition
-
-import java.util.concurrent.TimeUnit
 
 class RetryableBatchingCursor<T> implements Iterable<T> {
     CriteriaDefinition filterCriteria
@@ -29,6 +30,7 @@ class RetryableBatchingCursor<T> implements Iterable<T> {
     Class<T> collectionClass
     int batchSize
     RetryableBatchingCursorIterator<T> resultIterator
+    boolean hasSessionSupport = true
     boolean initialized = false
 
     // Need this to satisfy Spring gods who feast on empty constructors
@@ -61,19 +63,33 @@ class RetryableBatchingCursor<T> implements Iterable<T> {
         if (!this.initialized) {
             ClientSessionOptions sessionOptions = ClientSessionOptions.builder()
                     .causallyConsistent(true).build()
-
-            ClientSession session = this.mongoTemplate.mongoDbFactory.getSession(sessionOptions)
-
-            mongoTemplate.withSession(() -> session).execute { mongoOp ->
-                def serverSessionID = session.serverSession.identifier
-                def mongoIterator = mongoOp.getCollection(this.collectionName).find(
-                        this.filterCriteria.criteriaObject).noCursorTimeout(true).batchSize(batchSize).iterator()
-                this.resultIterator = new RetryableBatchingCursorIterator(session, serverSessionID,
-                        this.collectionClass, this.mongoTemplate, mongoIterator, this.batchSize)
+            ClientSession session = null
+            try {
+                this.mongoTemplate.mongoDbFactory.getSession(sessionOptions)
+                this.hasSessionSupport = true
+            }
+            catch (MongoClientException ex) { // Handle stand-alone instances that don't have session support
+                if (ex.getMessage().toLowerCase().contains("sessions are not supported")) {
+                    this.hasSessionSupport = false
+                }
+            }
+            if (this.hasSessionSupport) {
+                mongoTemplate.withSession(() -> session).execute { mongoOp ->
+                    def serverSessionID = session.serverSession.identifier
+                    this.initializeCursor(session, serverSessionID, mongoOp)}
+            } else {
+                this.initializeCursor(null, null, this.mongoTemplate)
             }
             this.initialized = true
         }
         return this.resultIterator
+    }
+
+    void initializeCursor(ClientSession session, BsonDocument serverSessionID, MongoOperations mongoOp) {
+        def mongoIterator = mongoOp.getCollection(this.collectionName).find(
+                this.filterCriteria.criteriaObject).noCursorTimeout(true).batchSize(batchSize).iterator()
+        this.resultIterator = new RetryableBatchingCursorIterator(session, serverSessionID,
+                this.collectionClass, this.mongoTemplate, mongoIterator, this.batchSize)
     }
 
     void setRefreshInterval (Long refreshInterval) {

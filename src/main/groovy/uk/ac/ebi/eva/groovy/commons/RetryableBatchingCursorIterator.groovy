@@ -37,6 +37,7 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
     MongoCursor<Document> mongoResultIterator
     ThreadPoolTaskScheduler scheduler
     int pageSize
+    boolean hasSessionSupport = false
     boolean startPeriodicRefreshThread = false
     // By default, the cursorTimeoutMillis on a Mongo server is 10 minutes
     // Therefore, try refreshing the cursors every 8 minutes (480e3 milliseconds)
@@ -56,8 +57,7 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
         this.mongoTemplate = mongoTemplate
         this.mongoResultIterator = mongoResultIterator
         this.pageSize = pageSize
-        this.startPeriodicRefreshThread = true
-        this.startPeriodicSessionRefresh()
+        this.hasSessionSupport = Objects.nonNull(this.session)
     }
 
     void setRefreshInterval (Long refreshInterval) {
@@ -79,7 +79,7 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
 
     @Override
     boolean hasNext() {
-        if (!startPeriodicRefreshThread) {
+        if (!startPeriodicRefreshThread && this.hasSessionSupport) {
             startPeriodicSessionRefresh()
             startPeriodicRefreshThread = true
         }
@@ -97,7 +97,7 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
             Boolean doWithRetry(RetryContext context) throws Throwable {
                 logger.debug("Retry count:" + context.retryCount)
                 boolean nextResult = this.hasNextResult()
-                if(!nextResult) this.scheduler.shutdown()
+                if(!nextResult && this.hasSessionSupport) this.scheduler.shutdown()
                 return nextResult
             }
         })
