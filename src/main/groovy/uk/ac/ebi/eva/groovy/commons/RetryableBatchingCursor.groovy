@@ -29,6 +29,7 @@ class RetryableBatchingCursor<T> implements Iterable<T> {
     Class<T> collectionClass
     int batchSize
     RetryableBatchingCursorIterator<T> resultIterator
+    boolean initialized = false
 
     // Need this to satisfy Spring gods who feast on empty constructors
     RetryableBatchingCursor() {}
@@ -53,23 +54,25 @@ class RetryableBatchingCursor<T> implements Iterable<T> {
         this.collectionClass = collectionClass
         this.batchSize = batchSize
         this.collectionName = Objects.isNull(collectionName)? this.mongoTemplate.getCollectionName(this.collectionClass): collectionName
-
-        ClientSessionOptions sessionOptions = ClientSessionOptions.builder()
-                .causallyConsistent(true).build()
-
-        ClientSession session = this.mongoTemplate.mongoDbFactory.getSession(sessionOptions)
-
-        mongoTemplate.withSession(() -> session).execute { mongoOp ->
-            def serverSessionID = session.serverSession.identifier
-            def mongoIterator = mongoOp.getCollection(this.collectionName).find(
-                    this.filterCriteria.criteriaObject).noCursorTimeout(true).batchSize(batchSize).iterator()
-            this.resultIterator = new RetryableBatchingCursorIterator(serverSessionID, this.collectionClass,
-                    this.mongoTemplate, mongoIterator, this.batchSize)
-        }
     }
 
     @Override
     RetryableBatchingCursorIterator<T> iterator() {
+        if (!this.initialized) {
+            ClientSessionOptions sessionOptions = ClientSessionOptions.builder()
+                    .causallyConsistent(true).build()
+
+            ClientSession session = this.mongoTemplate.mongoDbFactory.getSession(sessionOptions)
+
+            mongoTemplate.withSession(() -> session).execute { mongoOp ->
+                def serverSessionID = session.serverSession.identifier
+                def mongoIterator = mongoOp.getCollection(this.collectionName).find(
+                        this.filterCriteria.criteriaObject).noCursorTimeout(true).batchSize(batchSize).iterator()
+                this.resultIterator = new RetryableBatchingCursorIterator(session, serverSessionID,
+                        this.collectionClass, this.mongoTemplate, mongoIterator, this.batchSize)
+            }
+            this.initialized = true
+        }
         return this.resultIterator
     }
 
