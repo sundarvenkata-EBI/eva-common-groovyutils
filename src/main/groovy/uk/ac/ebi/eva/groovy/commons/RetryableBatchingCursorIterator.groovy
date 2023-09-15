@@ -17,6 +17,8 @@ package uk.ac.ebi.eva.groovy.commons
 
 import com.mongodb.MongoCursorNotFoundException
 import com.mongodb.client.MongoCursor
+import com.mongodb.session.ClientSession
+import org.bson.BsonDocument
 import org.bson.Document
 import org.slf4j.LoggerFactory
 import org.springframework.data.mongodb.core.MongoTemplate
@@ -25,28 +27,62 @@ import org.springframework.retry.RetryContext
 import org.springframework.retry.backoff.FixedBackOffPolicy
 import org.springframework.retry.policy.SimpleRetryPolicy
 import org.springframework.retry.support.RetryTemplate
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 
 class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
+    ClientSession session
+    BsonDocument serverSessionID
     MongoTemplate mongoTemplate
     Class<T> collectionClass
     MongoCursor<Document> mongoResultIterator
+    ThreadPoolTaskScheduler scheduler
     int pageSize
+    boolean hasSessionSupport = false
+    boolean startPeriodicRefreshThread = false
+    // By default, the cursorTimeoutMillis on a Mongo server is 10 minutes
+    // Therefore, try refreshing the cursors every 8 minutes (480e3 milliseconds)
+    Long refreshInterval = 480e3.toLong()
 
     final static def logger = LoggerFactory.getLogger(RetryableBatchingCursorIterator.class)
 
     // Need this to satisfy Spring gods who feast on empty constructors
     RetryableBatchingCursorIterator() {}
 
-    RetryableBatchingCursorIterator(Class<T> collectionClass, MongoTemplate mongoTemplate, MongoCursor<Document> mongoResultIterator,
+    RetryableBatchingCursorIterator(ClientSession session, BsonDocument serverSessionID, Class<T> collectionClass,
+                                    MongoTemplate mongoTemplate, MongoCursor<Document> mongoResultIterator,
                                     int pageSize) {
+        this.session = session
+        this.serverSessionID = serverSessionID
         this.collectionClass = collectionClass
         this.mongoTemplate = mongoTemplate
         this.mongoResultIterator = mongoResultIterator
         this.pageSize = pageSize
+        this.hasSessionSupport = Objects.nonNull(this.session)
+    }
+
+    void setRefreshInterval (Long refreshInterval) {
+        this.refreshInterval = refreshInterval
+    }
+
+    private void startPeriodicSessionRefresh() {
+        scheduler = new ThreadPoolTaskScheduler()
+        scheduler.setPoolSize(3)
+        scheduler.initialize()
+        scheduler.setWaitForTasksToCompleteOnShutdown(true)
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            @Override
+            void run() {
+                this.mongoTemplate.db.runCommand(new Document("refreshSessions", Arrays.asList(this.serverSessionID)))
+            }
+        }, this.refreshInterval)
     }
 
     @Override
     boolean hasNext() {
+        if (!startPeriodicRefreshThread && this.hasSessionSupport) {
+            startPeriodicSessionRefresh()
+            startPeriodicRefreshThread = true
+        }
         RetryTemplate retryTemplate = new RetryTemplate()
 
         FixedBackOffPolicy fixedBackOffPolicy = new FixedBackOffPolicy()
@@ -60,7 +96,9 @@ class RetryableBatchingCursorIterator<T> implements Iterator<List<T>> {
             @Override
             Boolean doWithRetry(RetryContext context) throws Throwable {
                 logger.debug("Retry count:" + context.retryCount)
-                return this.hasNextResult()
+                boolean nextResult = this.hasNextResult()
+                if(!nextResult && this.hasSessionSupport) this.scheduler.shutdown()
+                return nextResult
             }
         })
 

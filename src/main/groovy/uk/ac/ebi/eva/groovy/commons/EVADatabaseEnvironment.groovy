@@ -18,6 +18,7 @@ package uk.ac.ebi.eva.groovy.commons
 import com.mongodb.MongoBulkWriteException
 import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.MongoClient
+import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.MapPropertySource
 import org.springframework.core.env.PropertiesPropertySource
@@ -52,6 +53,7 @@ class EVADatabaseEnvironment {
     static def dbsnpCveClass = DbsnpClusteredVariantEntity.class
     static def cvoeClass = ClusteredVariantOperationEntity.class
     static def dbsnpCvoeClass = DbsnpClusteredVariantOperationEntity.class
+    final static def logger = LoggerFactory.getLogger(EVADatabaseEnvironment.class)
 
     EVADatabaseEnvironment(MongoClient mongoClient, MongoTemplate mongoTemplate,
                            SubmittedVariantAccessioningService submittedVariantAccessioningService,
@@ -86,8 +88,13 @@ class EVADatabaseEnvironment {
 
         def mc = context.getBean(MongoClient.class)
         def mt = context.getBean(MongoTemplate.class)
-        def sva = context.getBean(SubmittedVariantAccessioningService.class)
-        def cva = context.getBean(ClusteredVariantAccessioningService.class)
+        def (sva, cva) = [null, null]
+        try {
+            sva = context.getBean(SubmittedVariantAccessioningService.class)
+            cva = context.getBean(ClusteredVariantAccessioningService.class)
+        } catch (Exception ex) {
+            logger.warn("Could not find beans for accessioning services... Skipping..." + ex.message)
+        }
         return new EVADatabaseEnvironment(mc, mt, sva, cva, context)
     }
 
