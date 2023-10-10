@@ -6,7 +6,7 @@ EBI EVA - Common Groovy Utilities
 graph TB  
   evaCommons("EVA Commons \n(variation-commons, accession-commons etc)")
   groovyUtils("eva-common-groovyutils")
-  springLayer("Spring Boot \n(Dependency injection)")
+  springLayer("Spring Boot \n(Dependency injection, job tracker etc.,)")
   javaDriver("MongoDB Java Driver")
   mongoLayer("MongoDB")
 
