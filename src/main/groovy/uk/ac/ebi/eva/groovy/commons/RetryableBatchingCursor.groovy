@@ -65,7 +65,7 @@ class RetryableBatchingCursor<T> implements Iterable<T> {
                     .causallyConsistent(true).build()
             ClientSession session = null
             try {
-                this.mongoTemplate.mongoDbFactory.getSession(sessionOptions)
+                session = this.mongoTemplate.mongoDbFactory.getSession(sessionOptions)
                 this.hasSessionSupport = true
             }
             catch (MongoClientException ex) { // Handle stand-alone instances that don't have session support

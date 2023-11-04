@@ -16,6 +16,8 @@
 package uk.ac.ebi.eva.groovy.commons
 
 import com.mongodb.MongoBulkWriteException
+import com.mongodb.ReadPreference
+import com.mongodb.WriteConcern
 import com.mongodb.bulk.BulkWriteResult
 import com.mongodb.MongoClient
 import org.slf4j.LoggerFactory
@@ -88,6 +90,8 @@ class EVADatabaseEnvironment {
 
         def mc = context.getBean(MongoClient.class)
         def mt = context.getBean(MongoTemplate.class)
+        mt.setReadPreference(ReadPreference.primary())
+        mt.setWriteConcern(WriteConcern.MAJORITY)
         def (sva, cva) = [null, null]
         try {
             sva = context.getBean(SubmittedVariantAccessioningService.class)
